@@ -1,0 +1,318 @@
+---
+title: "Gout management in Hospital"
+author:
+- Jacklyn Chin
+- David Fong
+output: 
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    toc_collapsed: true
+toc_depth: 3
+number_sections: true
+theme: lumen
+date: "27th August 2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warnings=FALSE, message=FALSE}
+library(ggplot2)  # plotting
+library(dplyr)    # data pliers
+library(gmodels)  # contingency tables
+library(mice)     # imputation
+library(corrplot) # correlation plot
+library(lme4)     # linear models
+library(ztable)   # cross-table display
+options(ztable.type="html")
+library(magrittr) # pipes
+library(janitor)  # clean names
+library(cAIC4)     # provides Akaike Information Criterion (AIC) step-wise for lme4
+library(huxtable)
+```
+
+## Read the data
+
+81 entries
+
+and 'clean up' the names
+
+```{r}
+d <- read.csv("SerumUricAcid.csv",
+              skip = 3, # a few rows to skip at the beginning
+              check.names = TRUE, # avoid duplicate names
+              stringsAsFactors = FALSE
+              )
+d <- d[seq(from = 1, to = 81),] # 81 entries
+```
+
+### Clean names
+
+'Clean up the names' - e.g. spaces changes to underscores '_'
+
+currently there are 'duplicate' names e.g. 'dose_3'
+
+```{r}
+names(d) <- make_clean_names(names(d))
+names(d)
+```
+
+### Some variables are 'categorical'
+
+...rather than ordered.
+
+```{r}
+d$gender <- factor(d$gender)
+d$grouped_units_of_admission <- factor(d$grouped_units_of_admission)
+d$hospital_campus <- factor(d$hospital_campus)
+d$hopc <- factor(d$hopc)
+```
+
+## Serum urate vs Already on Urate Lowering Therapy 
+
+`serum_urate_level_mmol_l` vs `ult_on_admission_y_n`
+
+### Boxplot
+
+```{r}
+p <- ggplot(
+  data = d,
+  aes(
+    group = ult_on_admission_y_n,
+    x = ult_on_admission_y_n,
+    y = serum_urate_level_mmol_l
+  )
+) + geom_boxplot()
+
+p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
+```
+
+### Wilcox unpaired
+
+(same as Mann-Whitney U)
+
+```{r}
+wilcox.test(
+  serum_urate_level_mmol_l ~ ult_on_admission_y_n,
+  data = d,
+  exact = FALSE, paired = FALSE
+)
+```
+
+## Rheumatology input
+
+### Age
+
+```{r}
+
+d_notRheumPt <- d %>%
+  filter(grouped_units_of_admission != 0)
+
+p <- ggplot(
+  data = d_notRheumPt,
+  aes(
+    group = rheum_input,
+    x = rheum_input,
+    y = age
+  )
+) + geom_boxplot()
+
+p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
+```
+
+### Unit of admission
+
+```{r results='asis'}
+ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$grouped_units_of_admission)) %>%
+  makeHeatmap(palette="Blues")
+```
+
+```{r R.options = list(width = 1000)}
+CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$grouped_units_of_admission,
+           chisq = TRUE)
+```
+
+```{r}
+p <- ggplot(
+  data = d_notRheumPt,
+  aes(
+    group = grouped_units_of_admission,
+    x = grouped_units_of_admission,
+    y = rheum_input
+  )
+) + geom_boxplot()
+
+p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
+```
+
+### Gender
+
+```{r}
+p <- ggplot(
+  data = d_notRheumPt,
+  aes(
+    group = rheum_input,
+    x = rheum_input,
+    y = gender
+  )
+) + geom_boxplot()
+
+p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
+```
+
+```{r results="asis"}
+ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$gender)) %>%
+  makeHeatmap(palette="Blues")
+```
+
+```{r}
+CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$gender,
+           chisq = TRUE)
+```
+
+### Campus
+
+```{r results='asis'}
+ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus)) %>%
+  makeHeatmap(palette="Blues")
+```
+```{r}
+CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus,
+           chisq = TRUE)
+```
+
+### Generalized Linear Model
+
+```{r}
+rheum_consulted <- glmer(
+  rheum_input ~ gender + age + ethnicity + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    number_of_active_joints_involved +
+    mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted)
+```
+
+```{r}
+predictors <- d_notRheumPt[, 
+  c("gender", "hopc", "grouped_units_of_admission", "duration_of_stay",
+    "number_of_active_joints_involved", "mtp", "knee", "ankle",
+    "elbow", "wrist", "mcp", "tophi")
+] %>%
+  mutate_all(function(x) as.numeric(as.character(x))) %>%
+  rename(c("admission_unit" = "grouped_units_of_admission", "number_of_joints" = "number_of_active_joints_involved"))
+  
+rheum_consult_predictor_cor <- cor(predictors, use = "complete.obs") %>% round(3)
+```
+
+```{r}
+corrplot(rheum_consult_predictor_cor,
+         type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+`number_of_active_joints_involved` heavily correlated with other variables (e.g. specific active joints), and
+little role in the model so far. Remove from model
+
+```{r}
+rheum_consulted2 <- glmer(
+  rheum_input ~ gender + age + ethnicity + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted2)
+```
+
+MTP, MCP, wrist and knee heavily correlated. Wrist has highest p-value, remove.
+
+```{r}
+rheum_consulted3 <- glmer(
+  rheum_input ~ gender + age + ethnicity + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    mtp + knee + ankle + elbow + mcp + tophi + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted3)
+```
+
+Remove tophi
+
+```{r}
+rheum_consulted4 <- glmer(
+  rheum_input ~ gender + age + ethnicity + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    mtp + knee + ankle + elbow + mcp + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted4)
+```
+
+Remove ankle
+
+```{r}
+rheum_consulted5 <- glmer(
+  rheum_input ~ gender + age + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    mtp + knee + elbow + mcp + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted5)
+```
+
+Remove mcp
+
+```{r}
+rheum_consulted6 <- glmer(
+  rheum_input ~ gender + age + hopc + 
+    grouped_units_of_admission + duration_of_stay +
+    mtp + knee + elbow + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted6)
+```
+
+Remove duration of stay
+
+```{r}
+rheum_consulted7 <- glmer(
+  rheum_input ~ gender + age + hopc + 
+    grouped_units_of_admission +
+    mtp + knee + elbow + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted7)
+```
+
+remove of age
+
+```{r}
+rheum_consulted8 <- glmer(
+  rheum_input ~ gender + hopc + 
+    grouped_units_of_admission +
+    mtp + knee + elbow + (1 | hospital_campus),
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted8)
+```
+
