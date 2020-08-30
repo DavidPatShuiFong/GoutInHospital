@@ -218,11 +218,11 @@ CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus,
 ### Generalized Linear Model
 
 ```{r}
-rheum_consulted <- glmer(
+rheum_consulted <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
     number_of_active_joints_involved +
-    mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
+    mtp + knee + ankle + elbow + wrist + mcp + tophi + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -251,10 +251,10 @@ corrplot(rheum_consult_predictor_cor,
 little role in the model so far. Remove from model
 
 ```{r}
-rheum_consulted2 <- glmer(
+rheum_consulted2 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
-    mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
+    mtp + knee + ankle + elbow + wrist + mcp + tophi + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -265,10 +265,10 @@ summary(rheum_consulted2)
 MTP, MCP, wrist and knee heavily correlated. Wrist has highest p-value, remove.
 
 ```{r}
-rheum_consulted3 <- glmer(
+rheum_consulted3 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
-    mtp + knee + ankle + elbow + mcp + tophi + (1 | hospital_campus),
+    mtp + knee + ankle + elbow + mcp + tophi + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -279,10 +279,10 @@ summary(rheum_consulted3)
 Remove tophi
 
 ```{r}
-rheum_consulted4 <- glmer(
+rheum_consulted4 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
-    mtp + knee + ankle + elbow + mcp + (1 | hospital_campus),
+    mtp + knee + ankle + elbow + mcp + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -293,10 +293,10 @@ summary(rheum_consulted4)
 Remove ankle
 
 ```{r}
-rheum_consulted5 <- glmer(
+rheum_consulted5 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
-    mtp + knee + elbow + mcp + (1 | hospital_campus),
+    mtp + knee + elbow + mcp + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -307,10 +307,10 @@ summary(rheum_consulted5)
 Remove mcp
 
 ```{r}
-rheum_consulted6 <- glmer(
+rheum_consulted6 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
-    mtp + knee + elbow + (1 | hospital_campus),
+    mtp + knee + elbow + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -321,10 +321,10 @@ summary(rheum_consulted6)
 Remove duration of stay
 
 ```{r}
-rheum_consulted7 <- glmer(
+rheum_consulted7 <- glm(
   rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission +
-    mtp + knee + elbow + (1 | hospital_campus),
+    mtp + knee + elbow + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -335,10 +335,10 @@ summary(rheum_consulted7)
 remove of age
 
 ```{r}
-rheum_consulted8 <- glmer(
+rheum_consulted8 <- glm(
   rheum_input ~ gender + hopc + 
     grouped_units_of_admission +
-    mtp + knee + elbow + (1 | hospital_campus),
+    mtp + knee + elbow + hospital_campus,
   data = d_notRheumPt,
   family = "binomial"
 )
@@ -375,8 +375,8 @@ CrossTable(d$ia_steroid_injections, d$rheum_input, fisher = TRUE)
 ### medications - sub-groups
 
 ```{r}
-hopc <- glmer(
-  hopc ~  thiazide_diuretics + loop_diuretics + k_sparing_diuretics + other_diuretics + b_blocker + ac_ei + arb + ccb + a_blocker + a_b_blocker + moxonidine + statins + fibrates + ezetimibe + aspirin + clopidogrel + (1 | hospital_campus),
+hopc <- glm(
+  hopc ~  thiazide_diuretics + loop_diuretics + k_sparing_diuretics + other_diuretics + b_blocker + ac_ei + arb + ccb + a_blocker + a_b_blocker + moxonidine + statins + fibrates + ezetimibe + aspirin + clopidogrel,
   data = d,
   family = "binomial"
 )
@@ -387,8 +387,8 @@ summary(hopc)
 ### medication - major groups
 
 ```{r}
-hopc2 <- glmer(
-  hopc ~  (x_diuretics_used > 0) + (x_anti_htn > 0) + (x_anti_chol_used > 0) + (x_anti_platelet_therapy > 0) + (1 | hospital_campus),
+hopc2 <- glm(
+  hopc ~  (x_diuretics_used > 0) + (x_anti_htn > 0) + (x_anti_chol_used > 0) + (x_anti_platelet_therapy > 0),
   data = d,
   family = "binomial"
 )
@@ -399,8 +399,8 @@ summary(hopc2)
 ### conditions
 
 ```{r}
-hopc3 <- glmer(
-  hopc ~  htn + t2dm + cvd + chol + ckd + (1 | hospital_campus),
+hopc3 <- glm(
+  hopc ~  htn + t2dm + cvd + chol + ckd,
   data = d,
   family = "binomial"
 )
@@ -408,8 +408,8 @@ hopc3 <- glmer(
 summary(hopc3)
 ```
 ```{r}
-hopc_ckd <- glmer(
-  hopc ~  ckd + (1 | hospital_campus),
+hopc_ckd <- glm(
+  hopc ~  ckd,
   data = d,
   family = "binomial"
 )
