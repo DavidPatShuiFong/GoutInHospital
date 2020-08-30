@@ -22,7 +22,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r warnings=FALSE, message=FALSE}
 library(ggplot2)  # plotting
+library(highcharter) # plotting
 library(dplyr)    # data pliers
+library(tidyr)    # 'tidy' up data
 library(gmodels)  # contingency tables
 library(mice)     # imputation
 library(corrplot) # correlation plot
@@ -31,7 +33,6 @@ library(ztable)   # cross-table display
 options(ztable.type="html")
 library(magrittr) # pipes
 library(janitor)  # clean names
-library(cAIC4)     # provides Akaike Information Criterion (AIC) step-wise for lme4
 library(huxtable)
 ```
 
@@ -52,11 +53,9 @@ d <- d[seq(from = 1, to = 81),] # 81 entries
 
 ### Clean names
 
-'Clean up the names' - e.g. spaces changes to underscores '_'
+'Clean up the names' - e.g. spaces changed to underscores '_'
 
-currently there are 'duplicate' names e.g. 'dose_3'
-
-```{r}
+```{r results='asis'}
 names(d) <- make_clean_names(names(d))
 names(d)
 ```
@@ -66,10 +65,25 @@ names(d)
 ...rather than ordered.
 
 ```{r}
-d$gender <- factor(d$gender)
-d$grouped_units_of_admission <- factor(d$grouped_units_of_admission)
-d$hospital_campus <- factor(d$hospital_campus)
-d$hopc <- factor(d$hopc)
+categorical_cols <- c("gender", "primary_care_team", "grouped_units_of_admission", "hospital_campus", "hopc",
+                      "rheum_input", "mtp", "ankle", "knee", "elbow", "wrist", "mcp", "tophi",
+                      "nsaid", "colchicine", "prednisolone", "wean", "ia_steroid_injections",
+                      "thiazide_diuretics", "loop_diuretics", "k_sparing_diuretics",
+                      "b_blocker", "ac_ei", "arb", "ccb", "a_blocker", "a_b_blocker", "moxonidine",
+                      "statins", "fibrates", "ezetimibe",
+                      "aspirin", "clopidogrel", "htn", "t2dm", "cvd", "chol", "ckd",
+                      "obesity", "clinical_asssesed_improvement", "patient_reported_improvemnet",
+                      "ult_on_admission_y_n", "commenced_during", "after_discharge", "change_dose",
+                      "ceased_withheld", "d_c_instructions_present",
+                      "none", "infections", "diuresis", "aki", "trauma", "cognitive_impairment",
+                      "acidosis", "other_rheum", "chemo", "surgery")
+
+d[categorical_cols] <- lapply(d[categorical_cols], factor) # apply 'factor' to those columns
+
+```
+
+```{r}
+summary(d)
 ```
 
 ## Serum urate vs Already on Urate Lowering Therapy 
@@ -89,6 +103,21 @@ p <- ggplot(
 ) + geom_boxplot()
 
 p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
+```
+
+same plot with `highcharter`
+
+```{r}
+highchart() %>%
+  hc_xAxis(type = "category") %>%
+  hc_add_series_list(
+    data_to_boxplot(
+      data = d,
+      variable = serum_urate_level_mmol_l,
+      group_var = ult_on_admission_y_n
+    )
+  ) %>%
+  hc_exporting(enabled = TRUE) # allow 'save'
 ```
 
 ### Wilcox unpaired
@@ -133,7 +162,7 @@ ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$grouped_units_of_admission))
 
 ```{r R.options = list(width = 1000)}
 CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$grouped_units_of_admission,
-           chisq = TRUE)
+           fisher = TRUE)
 ```
 
 ```{r}
@@ -171,7 +200,7 @@ ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$gender)) %>%
 
 ```{r}
 CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$gender,
-           chisq = TRUE)
+           fisher = TRUE)
 ```
 
 ### Campus
@@ -182,7 +211,7 @@ ztable(table(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus)) %>%
 ```
 ```{r}
 CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus,
-           chisq = TRUE)
+           fisher = TRUE)
 ```
 
 ### Generalized Linear Model
@@ -316,3 +345,111 @@ rheum_consulted8 <- glmer(
 summary(rheum_consulted8)
 ```
 
+## Secondary gout
+
+### medications - sub-groups
+
+```{r}
+hopc <- glmer(
+  hopc ~  thiazide_diuretics + loop_diuretics + k_sparing_diuretics + other_diuretics + b_blocker + ac_ei + arb + ccb + a_blocker + a_b_blocker + moxonidine + statins + fibrates + ezetimibe + aspirin + clopidogrel + (1 | hospital_campus),
+  data = d,
+  family = "binomial"
+)
+
+summary(hopc)
+```
+
+### medication - major groups
+
+```{r}
+hopc2 <- glmer(
+  hopc ~  (x_diuretics_used > 0) + (x_anti_htn > 0) + (x_anti_chol_used > 0) + (x_anti_platelet_therapy > 0) + (1 | hospital_campus),
+  data = d,
+  family = "binomial"
+)
+
+summary(hopc2)
+```
+
+### conditions
+
+```{r}
+hopc3 <- glmer(
+  hopc ~  htn + t2dm + cvd + chol + ckd + (1 | hospital_campus),
+  data = d,
+  family = "binomial"
+)
+# not including obesity
+summary(hopc3)
+```
+
+### co-morbidities
+
+```{r results='asis'}
+n_comorbidities_hopc <- table(d$x_total_comorbidities, d$hopc)
+
+ztable(n_comorbidities_hopc) %>%
+    makeHeatmap(palette="Blues")
+```
+
+```{r}
+CrossTable(d$x_total_comorbidities, d$hopc,
+           fisher = TRUE)
+```
+```{r}
+comorbidities_hopc_df <- as.data.frame(n_comorbidities_hopc) %>%
+  rename(n_comorbidities = Var1, hopc = 2)
+comorbidities_hopc_df
+```
+
+```{r}
+comorbidities_hopc_df_wide <- pivot_wider(
+  data = comorbidities_hopc_df,
+  names_from = hopc,
+  values_from = Freq
+) %>% 
+  rename(c("Primary" = "1", "Secondary" = "2")) %>%
+  mutate(Proportion_Secondary = Secondary / (Primary + Secondary))
+comorbidities_hopc_df_wide
+```
+
+
+```{r}
+highchart() %>% 
+  hc_chart(type = "column") %>% 
+  hc_title(text = "Co-morbidities and Secondary Gout") %>%
+  hc_xAxis(title = list(text = "Number of co-morbidities")) %>%
+  hc_yAxis(title = list(text = "n")) %>%
+  hc_plotOptions(column = list(
+    dataLabels = list(enabled = FALSE),
+    stacking = "normal",
+    enableMouseTracking = FALSE)
+  ) %>% 
+  hc_series(list(name = "Primary",
+                 data = comorbidities_hopc_df_wide$Primary),
+            list(name = "Secondary",
+                 data = comorbidities_hopc_df_wide$Secondary)
+  ) %>%
+  hc_exporting(enabled = TRUE) # allow 'save'
+```
+
+```{r}
+highchart() %>% 
+  hc_chart(type = "line") %>% 
+  hc_title(text = "Co-morbidities and Secondary Gout") %>%
+  hc_xAxis(title = list(text = "Number of co-morbidities")) %>%
+  hc_yAxis(title = list(text = "Proportion secondary")) %>%
+  hc_series(list(name = "Secondary proportion",
+                 data = comorbidities_hopc_df_wide$Proportion_Secondary)) %>%
+  hc_exporting(enabled = TRUE) # allow 'save'
+```
+```
+
+```{r}
+hopc4 <- glmer(
+  hopc ~  x_total_comorbidities + (1 | hospital_campus),
+  data = d,
+  family = "binomial"
+)
+summary(hopc4)
+```
