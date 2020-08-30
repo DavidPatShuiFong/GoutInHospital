@@ -65,7 +65,7 @@ names(d)
 ...rather than ordered.
 
 ```{r}
-categorical_cols <- c("gender", "primary_care_team", "grouped_units_of_admission", "hospital_campus", "hopc",
+categorical_cols <- c("gender", "primary_care_team", "ethnicity", "grouped_units_of_admission", "hospital_campus", "hopc",
                       "rheum_input", "mtp", "ankle", "knee", "elbow", "wrist", "mcp", "tophi",
                       "nsaid", "colchicine", "prednisolone", "wean", "ia_steroid_injections",
                       "thiazide_diuretics", "loop_diuretics", "k_sparing_diuretics",
@@ -153,6 +153,7 @@ p <- ggplot(
 p + stat_summary(fun = mean, geom = "point", shape = 23, size = 4)
 ```
 
+
 ### Unit of admission
 
 ```{r results='asis'}
@@ -218,7 +219,7 @@ CrossTable(d_notRheumPt$rheum_input, d_notRheumPt$hospital_campus,
 
 ```{r}
 rheum_consulted <- glmer(
-  rheum_input ~ gender + age + ethnicity + hopc + 
+  rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
     number_of_active_joints_involved +
     mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
@@ -251,7 +252,7 @@ little role in the model so far. Remove from model
 
 ```{r}
 rheum_consulted2 <- glmer(
-  rheum_input ~ gender + age + ethnicity + hopc + 
+  rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
     mtp + knee + ankle + elbow + wrist + mcp + tophi + (1 | hospital_campus),
   data = d_notRheumPt,
@@ -265,7 +266,7 @@ MTP, MCP, wrist and knee heavily correlated. Wrist has highest p-value, remove.
 
 ```{r}
 rheum_consulted3 <- glmer(
-  rheum_input ~ gender + age + ethnicity + hopc + 
+  rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
     mtp + knee + ankle + elbow + mcp + tophi + (1 | hospital_campus),
   data = d_notRheumPt,
@@ -279,7 +280,7 @@ Remove tophi
 
 ```{r}
 rheum_consulted4 <- glmer(
-  rheum_input ~ gender + age + ethnicity + hopc + 
+  rheum_input ~ gender + age + hopc + 
     grouped_units_of_admission + duration_of_stay +
     mtp + knee + ankle + elbow + mcp + (1 | hospital_campus),
   data = d_notRheumPt,
@@ -345,6 +346,30 @@ rheum_consulted8 <- glmer(
 summary(rheum_consulted8)
 ```
 
+## Gout therapy
+
+```{r}
+CrossTable(d$prednisolone, d$rheum_input, fisher = TRUE)
+```
+
+```{r}
+CrossTable(d$ia_steroid_injections, d$rheum_input, fisher = TRUE)
+```
+
+```{r}
+hopc <- glm(
+  ia_steroid_injections ~ rheum_input,
+  data = d,
+  family = "binomial"
+)
+
+summary(hopc)
+```
+
+```{r}
+CrossTable(d$ia_steroid_injections, d$rheum_input, fisher = TRUE)
+```
+
 ## Secondary gout
 
 ### medications - sub-groups
@@ -381,6 +406,15 @@ hopc3 <- glmer(
 )
 # not including obesity
 summary(hopc3)
+```
+```{r}
+hopc_ckd <- glmer(
+  hopc ~  ckd + (1 | hospital_campus),
+  data = d,
+  family = "binomial"
+)
+# not including obesity
+summary(hopc_ckd)
 ```
 
 ### co-morbidities
@@ -457,18 +491,60 @@ highchart() %>%
   ) %>%
   hc_add_series(name = "Secondary proportion",
                 data = comorbidities_hopc_df_wide$Proportion_Secondary,
-                type = "line",
+                type = "line", color = "red",
                 yAxis = 1
   ) %>%
   hc_exporting(enabled = TRUE) # allow 'save'
 ```
+
+```{r}
+hopc4 <- glm(
+  hopc ~  x_total_comorbidities,
+  data = d,
+  family = "binomial"
+)
+summary(hopc4)
 ```
 
 ```{r}
-hopc4 <- glmer(
-hopc ~  x_total_comorbidities + (1 | hospital_campus),
-data = d,
-family = "binomial"
-)
-summary(hopc4)
+ULT_category_rheum <- d %>%
+  mutate(ULT_change_category =
+           case_when(
+             ult_on_admission_y_n == 1 & change_dose == 0 & ceased_withheld == 0 ~ "On, no change",
+             ult_on_admission_y_n == 1 & change_dose == 1 ~ "On and changed",
+             ult_on_admission_y_n == 1 & ceased_withheld == 1 ~ "On and ceased",
+             ult_on_admission_y_n == 0 & commenced_during == 0 & after_discharge == 0 ~ "None, not started",
+             ult_on_admission_y_n == 0 & commenced_during == 1 ~ "None, started during admission",
+             ult_on_admission_y_n == 0 & after_discharge == 1 ~ "None, started on discharge",
+             TRUE ~ "Everything else"
+           )) %>%
+  mutate(ULT_change_category = factor(ULT_change_category)) %>%
+  select(ULT_change_category, rheum_input)
+summary(ULT_category_rheum)
+```
+
+```{r}
+CrossTable(ULT_category_rheum$ULT_change_category, ULT_category_rheum$rheum_input, fisher = TRUE)
+```
+
+```{r}
+ULT_category_rheum2 <- d %>%
+  mutate(ULT_change_category =
+           case_when(
+             ult_on_admission_y_n == 1 & change_dose == 0 & ceased_withheld == 0 ~ "Indifferent",
+             ult_on_admission_y_n == 1 & change_dose == 1 ~ "Good",
+             ult_on_admission_y_n == 1 & ceased_withheld == 1 ~ "Bad",
+             ult_on_admission_y_n == 0 & commenced_during == 0 & after_discharge == 0 ~ "Bad",
+             ult_on_admission_y_n == 0 & commenced_during == 1 ~ "Good",
+             ult_on_admission_y_n == 0 & after_discharge == 1 ~ "Good",
+             TRUE ~ "Everything else"
+           )) %>%
+  mutate(ULT_change_category = factor(ULT_change_category)) %>%
+  select(ULT_change_category, rheum_input)
+summary(ULT_category_rheum2)
+```
+
+```{r}
+ULT_category_rheum2b <- ULT_category_rheum2 %>% filter(ULT_change_category != "Indifferent")
+CrossTable(ULT_category_rheum2b$ULT_change_category, ULT_category_rheum2b$rheum_input, fisher = TRUE)
 ```
