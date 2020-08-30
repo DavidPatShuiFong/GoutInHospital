@@ -370,6 +370,32 @@ rheum_consulted10 <- glm(
 summary(rheum_consulted10)
 ```
 
+just grouped units of admission and campus
+
+```{r}
+rheum_consulted11 <- glm(
+  rheum_input ~ grouped_units_of_admission + hospital_campus,
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted11)
+```
+
+```{r}
+CrossTable(d_notRheumPt$number_of_active_joints_involved, d_notRheumPt$rheum_input, fisher = TRUE)
+```
+
+```{r}
+rheum_consulted12 <- glm(
+  rheum_input ~ number_of_active_joints_involved + hospital_campus,
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted12)
+```
+
 ## Gout therapy
 
 ```{r}
