@@ -506,6 +506,8 @@ hopc4 <- glm(
 summary(hopc4)
 ```
 
+## Change in ULT therapy vs. `rheum_input`
+
 ```{r}
 ULT_category_rheum <- d %>%
   mutate(ULT_change_category =
