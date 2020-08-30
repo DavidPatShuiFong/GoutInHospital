@@ -47,7 +47,7 @@ d <- read.csv("SerumUricAcid.csv",
               skip = 3, # a few rows to skip at the beginning
               check.names = TRUE, # avoid duplicate names
               stringsAsFactors = FALSE
-              )
+)
 d <- d[seq(from = 1, to = 81),] # 81 entries
 ```
 
@@ -231,13 +231,13 @@ summary(rheum_consulted)
 
 ```{r}
 predictors <- d_notRheumPt[, 
-  c("gender", "hopc", "grouped_units_of_admission", "duration_of_stay",
-    "number_of_active_joints_involved", "mtp", "knee", "ankle",
-    "elbow", "wrist", "mcp", "tophi")
+                           c("gender", "hopc", "grouped_units_of_admission", "duration_of_stay",
+                             "number_of_active_joints_involved", "mtp", "knee", "ankle",
+                             "elbow", "wrist", "mcp", "tophi")
 ] %>%
   mutate_all(function(x) as.numeric(as.character(x))) %>%
   rename(c("admission_unit" = "grouped_units_of_admission", "number_of_joints" = "number_of_active_joints_involved"))
-  
+
 rheum_consult_predictor_cor <- cor(predictors, use = "complete.obs") %>% round(3)
 ```
 
@@ -389,7 +389,7 @@ summary(hopc3)
 n_comorbidities_hopc <- table(d$x_total_comorbidities, d$hopc)
 
 ztable(n_comorbidities_hopc) %>%
-    makeHeatmap(palette="Blues")
+  makeHeatmap(palette="Blues")
 ```
 
 ```{r}
@@ -434,22 +434,41 @@ highchart() %>%
 ```
 
 ```{r}
+
 highchart() %>% 
-  hc_chart(type = "line") %>% 
+  hc_chart(type = "column") %>% 
   hc_title(text = "Co-morbidities and Secondary Gout") %>%
   hc_xAxis(title = list(text = "Number of co-morbidities")) %>%
-  hc_yAxis(title = list(text = "Proportion secondary")) %>%
-  hc_series(list(name = "Secondary proportion",
-                 data = comorbidities_hopc_df_wide$Proportion_Secondary)) %>%
+  hc_yAxis_multiples(list(title = list(text = "n")),
+                     list(title = list(text = "Proportion secondary"),
+                          opposite = TRUE, min = 0, max = 1)
+  ) %>%
+  hc_plotOptions(column = list(
+    dataLabels = list(enabled = FALSE),
+    stacking = "normal",
+    enableMouseTracking = FALSE)
+  ) %>% 
+  hc_series(list(name = "Primary",
+                 data = comorbidities_hopc_df_wide$Primary,
+                 yAxis = 0),
+            list(name = "Secondary",
+                 data = comorbidities_hopc_df_wide$Secondary,
+                 yAxis = 0)
+  ) %>%
+  hc_add_series(name = "Secondary proportion",
+                data = comorbidities_hopc_df_wide$Proportion_Secondary,
+                type = "line",
+                yAxis = 1
+  ) %>%
   hc_exporting(enabled = TRUE) # allow 'save'
 ```
 ```
 
 ```{r}
 hopc4 <- glmer(
-  hopc ~  x_total_comorbidities + (1 | hospital_campus),
-  data = d,
-  family = "binomial"
+hopc ~  x_total_comorbidities + (1 | hospital_campus),
+data = d,
+family = "binomial"
 )
 summary(hopc4)
 ```
