@@ -332,7 +332,7 @@ rheum_consulted7 <- glm(
 summary(rheum_consulted7)
 ```
 
-remove of age
+remove age
 
 ```{r}
 rheum_consulted8 <- glm(
@@ -344,6 +344,30 @@ rheum_consulted8 <- glm(
 )
 
 summary(rheum_consulted8)
+```
+remove admission group
+
+```{r}
+rheum_consulted9 <- glm(
+  rheum_input ~ gender + hopc + 
+    mtp + knee + elbow + hospital_campus,
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted9)
+```
+
+just some joints and campus
+
+```{r}
+rheum_consulted10 <- glm(
+  rheum_input ~  mtp + knee + elbow + hospital_campus,
+  data = d_notRheumPt,
+  family = "binomial"
+)
+
+summary(rheum_consulted10)
 ```
 
 ## Gout therapy
